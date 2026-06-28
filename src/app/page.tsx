@@ -73,6 +73,9 @@ export default function LandingPage() {
             <Link href="/awards" className="hover:text-foreground">
               Case Law
             </Link>
+            <Link href="/pricing" className="hover:text-foreground">
+              Pricing
+            </Link>
             <Link href="/dashboard" className="hover:text-foreground">
               Product
             </Link>

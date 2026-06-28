@@ -53,8 +53,12 @@ import {
   DialogDescription,
   DialogClose,
 } from '@/components/ui/dialog';
+import Link from 'next/link';
 import { CURRENT_USER } from '@/lib/data';
 import { formatDate, initials } from '@/lib/utils';
+import { getCurrentSubscription } from '@/lib/billing/account';
+import { getPlan, formatPrice } from '@/lib/billing/plans';
+import { customerPortalUrl } from '@/lib/billing/payments';
 
 export const metadata: Metadata = { title: 'Settings' };
 
@@ -68,15 +72,6 @@ type ToggleSetting = {
 };
 
 type UsageMetric = { label: string; used: number; cap: number; icon: LucideIcon };
-
-const PLAN_FEATURES = [
-  'Unlimited cases & employees',
-  'AI letter drafting — 50 / month',
-  'Industrial Court award search',
-  'Domestic inquiry toolkit',
-  'Up to 3 team seats',
-  'Priority email support',
-];
 
 const USAGE: UsageMetric[] = [
   { label: 'AI letters generated', used: 18, cap: 50, icon: FileText },
@@ -181,7 +176,11 @@ function InfoRow({ icon: Icon, label, value }: { icon: LucideIcon; label: string
 }
 
 export default function SettingsPage() {
-  const renewDate = formatDate('2026-07-15');
+  const sub = getCurrentSubscription();
+  const plan = getPlan(sub.planId);
+  const planPrice = sub.period === 'monthly' ? plan.priceMonthly : plan.priceYearly;
+  const renewDate = sub.currentPeriodEnd ? formatDate(sub.currentPeriodEnd) : '—';
+  const portalUrl = customerPortalUrl();
 
   return (
     <div className="space-y-6">
@@ -374,11 +373,15 @@ export default function SettingsPage() {
               <CardHeader className="flex-row items-start justify-between space-y-0">
                 <div className="space-y-1.5">
                   <CardTitle className="flex items-center gap-2 text-lg">
-                    <BadgeCheck className="h-5 w-5 text-primary" /> Professional
+                    <BadgeCheck className="h-5 w-5 text-primary" /> {plan.name}
                   </CardTitle>
-                  <CardDescription>RM149 / month · billed monthly</CardDescription>
+                  <CardDescription>
+                    {formatPrice(planPrice)}
+                    {planPrice > 0 &&
+                      ` / ${sub.period === 'monthly' ? 'month' : 'year'} · billed ${sub.period}`}
+                  </CardDescription>
                 </div>
-                <Badge variant="success">Active</Badge>
+                <Badge variant="success">{sub.status === 'active' ? 'Active' : sub.status}</Badge>
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -391,7 +394,7 @@ export default function SettingsPage() {
                     Included in your plan
                   </p>
                   <ul className="mt-3 grid gap-2.5 sm:grid-cols-2">
-                    {PLAN_FEATURES.map((f) => (
+                    {plan.features.map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm text-foreground">
                         <Check className="h-4 w-4 shrink-0 text-success" strokeWidth={3} />
                         {f}
@@ -405,11 +408,21 @@ export default function SettingsPage() {
                   Visa ending 4242 · next charge {renewDate}
                 </span>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    <CreditCard className="h-4 w-4" /> Manage billing
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    Change plan
+                  {portalUrl ? (
+                    <Button asChild variant="outline" size="sm">
+                      <a href={portalUrl} target="_blank" rel="noopener noreferrer">
+                        <CreditCard className="h-4 w-4" /> Manage billing
+                      </a>
+                    </Button>
+                  ) : (
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/pricing">
+                        <CreditCard className="h-4 w-4" /> Manage billing
+                      </Link>
+                    </Button>
+                  )}
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href="/pricing">Change plan</Link>
                   </Button>
                 </div>
               </CardFooter>
