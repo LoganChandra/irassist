@@ -6,7 +6,6 @@ import {
   FolderOpen,
   FileSearch,
   TrendingUp,
-  Timer,
   CalendarDays,
   ChevronDown,
   Download,
@@ -14,80 +13,63 @@ import {
 import { PageHeader } from '@/components/ui/page-header';
 import { StatCard } from '@/components/ui/stat-card';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Disclaimer } from '@/components/ui/disclaimer';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, DonutChart, LineChart } from '@/components/charts/charts';
-import {
-  CASES,
-  casesByCategory,
-  casesByDepartment,
-  statusCounts,
-} from '@/lib/data';
+import { getCases } from '@/lib/data/db';
+import { casesByCategory, casesByDepartment, statusCounts } from '@/lib/data/compute';
+import type { IRCase } from '@/lib/types';
 
 export const metadata: Metadata = { title: 'Reports' };
 
-// Plausible six-month intake trend. Loosely tracks the seeded caseload, which
-// is concentrated in Apr–May, with the current month still in progress.
-const MONTHLY_CASES = [4, 5, 6, 7, 5, 3];
-const MONTHLY_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+type Kpi = { label: string; value: number | string; icon: LucideIcon; iconClassName?: string };
 
-type Kpi = {
-  label: string;
-  value: number | string;
-  icon: LucideIcon;
-  iconClassName?: string;
-  delta: string;
-};
+function monthlyIntake(cases: IRCase[]) {
+  const now = new Date();
+  const labels: string[] = [];
+  const values: number[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    labels.push(d.toLocaleDateString('en-GB', { month: 'short' }));
+    values.push(
+      cases.filter((c) => {
+        const cd = new Date(c.dateOpened);
+        return cd.getMonth() === d.getMonth() && cd.getFullYear() === d.getFullYear();
+      }).length
+    );
+  }
+  return { labels, values };
+}
 
-export default function ReportsPage() {
-  const counts = statusCounts();
+export default async function ReportsPage() {
+  const cases = await getCases();
+  const counts = statusCounts(cases);
   const statusData = Object.entries(counts).map(([label, value]) => ({ label, value }));
+  const { labels, values } = monthlyIntake(cases);
 
   const kpis: Kpi[] = [
-    {
-      label: 'Total Cases',
-      value: CASES.length,
-      icon: Briefcase,
-      delta: '+12% from last month',
-    },
-    {
-      label: 'Closed Cases',
-      value: counts.Closed,
-      icon: CheckCircle2,
-      iconClassName: 'bg-success/10 text-success',
-      delta: '+1 from last month',
-    },
+    { label: 'Total Cases', value: cases.length, icon: Briefcase },
     {
       label: 'Open Cases',
       value: counts.Open,
       icon: FolderOpen,
-      delta: '+2 from last month',
     },
     {
       label: 'Investigations',
       value: counts.Investigation,
       icon: FileSearch,
       iconClassName: 'bg-warning/10 text-warning',
-      delta: '-1 from last month',
     },
     {
       label: 'PIP Cases',
       value: counts.PIP,
       icon: TrendingUp,
       iconClassName: 'bg-warning/10 text-warning',
-      delta: 'Unchanged from last month',
     },
     {
-      label: 'Avg. Case Duration',
-      value: '18.5 days',
-      icon: Timer,
-      delta: '-2.3 days vs last month',
+      label: 'Closed Cases',
+      value: counts.Closed,
+      icon: CheckCircle2,
+      iconClassName: 'bg-success/10 text-success',
     },
   ];
 
@@ -107,7 +89,7 @@ export default function ReportsPage() {
       </PageHeader>
 
       {/* KPI row */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {kpis.map((k) => (
           <StatCard
             key={k.label}
@@ -115,7 +97,6 @@ export default function ReportsPage() {
             value={k.value}
             icon={k.icon}
             iconClassName={k.iconClassName}
-            delta={k.delta}
           />
         ))}
       </div>
@@ -128,7 +109,7 @@ export default function ReportsPage() {
             <CardDescription>New cases opened over the last six months.</CardDescription>
           </CardHeader>
           <CardContent>
-            <LineChart values={MONTHLY_CASES} labels={MONTHLY_LABELS} />
+            <LineChart values={values} labels={labels} />
           </CardContent>
         </Card>
 
@@ -138,7 +119,11 @@ export default function ReportsPage() {
             <CardDescription>Breakdown across disciplinary issue types.</CardDescription>
           </CardHeader>
           <CardContent>
-            <DonutChart data={casesByCategory()} />
+            {cases.length ? (
+              <DonutChart data={casesByCategory(cases)} />
+            ) : (
+              <p className="py-10 text-center text-sm text-muted-foreground">No cases yet.</p>
+            )}
           </CardContent>
         </Card>
 
@@ -148,7 +133,11 @@ export default function ReportsPage() {
             <CardDescription>Where matters are being raised.</CardDescription>
           </CardHeader>
           <CardContent>
-            <BarChart data={casesByDepartment()} />
+            {cases.length ? (
+              <BarChart data={casesByDepartment(cases)} />
+            ) : (
+              <p className="py-10 text-center text-sm text-muted-foreground">No cases yet.</p>
+            )}
           </CardContent>
         </Card>
 
@@ -158,16 +147,14 @@ export default function ReportsPage() {
             <CardDescription>Current state of the active caseload.</CardDescription>
           </CardHeader>
           <CardContent>
-            <DonutChart data={statusData} />
+            {cases.length ? (
+              <DonutChart data={statusData} />
+            ) : (
+              <p className="py-10 text-center text-sm text-muted-foreground">No cases yet.</p>
+            )}
           </CardContent>
         </Card>
       </div>
-
-      <Disclaimer>
-        <span className="font-medium text-foreground">Demo analytics.</span> Figures are computed
-        from sample caseload data for illustration only — not a record of real disciplinary
-        matters.
-      </Disclaimer>
     </div>
   );
 }

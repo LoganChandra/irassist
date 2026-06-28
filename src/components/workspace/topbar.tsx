@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Bell, ChevronDown, LogOut, Menu, Search, Settings, User } from 'lucide-react';
 import { Logo } from '@/components/brand/logo';
 import { SidebarNav } from './sidebar-nav';
@@ -15,11 +16,32 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { CURRENT_USER } from '@/lib/data';
+import { createClient } from '@/lib/supabase/client';
+import { isDemoMode } from '@/lib/env';
 import { initials } from '@/lib/utils';
 
-export function Topbar() {
+export interface TopbarUser {
+  name: string;
+  fullName: string;
+  role: string;
+  email: string;
+}
+
+export function Topbar({ user }: { user: TopbarUser }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const router = useRouter();
+
+  async function signOut() {
+    if (!isDemoMode()) {
+      try {
+        await createClient().auth.signOut();
+      } catch {
+        // ignore — still send them to login
+      }
+    }
+    router.push('/login');
+    router.refresh();
+  }
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur md:px-6">
@@ -65,23 +87,19 @@ export function Topbar() {
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 hover:bg-secondary">
               <Avatar className="h-8 w-8">
-                <AvatarFallback>{initials(CURRENT_USER.fullName)}</AvatarFallback>
+                <AvatarFallback>{initials(user.fullName || user.name)}</AvatarFallback>
               </Avatar>
               <span className="hidden text-left leading-tight sm:block">
-                <span className="block text-sm font-medium text-foreground">
-                  {CURRENT_USER.name}
-                </span>
-                <span className="block text-xs text-muted-foreground">{CURRENT_USER.role}</span>
+                <span className="block text-sm font-medium text-foreground">{user.name}</span>
+                <span className="block text-xs text-muted-foreground">{user.role}</span>
               </span>
               <ChevronDown className="hidden h-4 w-4 text-muted-foreground sm:block" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
-              <div className="font-medium">{CURRENT_USER.fullName}</div>
-              <div className="text-xs font-normal text-muted-foreground">
-                {CURRENT_USER.email}
-              </div>
+              <div className="font-medium">{user.fullName || user.name}</div>
+              <div className="text-xs font-normal text-muted-foreground">{user.email}</div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
@@ -95,10 +113,8 @@ export function Topbar() {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/login">
-                <LogOut /> Sign out
-              </Link>
+            <DropdownMenuItem onSelect={signOut}>
+              <LogOut /> Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

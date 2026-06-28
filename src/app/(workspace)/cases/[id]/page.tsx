@@ -17,7 +17,8 @@ import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { getCaseById, getRelatedCases } from '@/lib/data';
+import { getCaseById, getCases } from '@/lib/data/db';
+import { relatedCases } from '@/lib/data/compute';
 import { formatDate, initials } from '@/lib/utils';
 
 export async function generateMetadata({
@@ -26,7 +27,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const c = getCaseById(id);
+  const c = await getCaseById(id);
   return { title: c ? `${c.id} · ${c.employeeName}` : 'Case' };
 }
 
@@ -36,9 +37,9 @@ export default async function CaseDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const c = getCaseById(id);
+  const c = await getCaseById(id);
   if (!c) notFound();
-  const related = getRelatedCases(c);
+  const related = relatedCases(await getCases(), c);
 
   return (
     <div className="space-y-6">

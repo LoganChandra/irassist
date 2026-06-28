@@ -54,9 +54,8 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import Link from 'next/link';
-import { CURRENT_USER } from '@/lib/data';
 import { formatDate, initials } from '@/lib/utils';
-import { getCurrentSubscription } from '@/lib/billing/account';
+import { getProfile, getSubscription } from '@/lib/data/db';
 import { getPlan, formatPrice } from '@/lib/billing/plans';
 import { customerPortalUrl } from '@/lib/billing/payments';
 
@@ -175,8 +174,17 @@ function InfoRow({ icon: Icon, label, value }: { icon: LucideIcon; label: string
   );
 }
 
-export default function SettingsPage() {
-  const sub = getCurrentSubscription();
+export default async function SettingsPage() {
+  const [profile, sub] = await Promise.all([getProfile(), getSubscription()]);
+  const user = profile ?? {
+    name: 'there',
+    fullName: '',
+    role: 'HR Admin',
+    email: '',
+    organization: '—',
+    industry: '—',
+    companySize: '—',
+  };
   const plan = getPlan(sub.planId);
   const planPrice = sub.period === 'monthly' ? plan.priceMonthly : plan.priceYearly;
   const renewDate = sub.currentPeriodEnd ? formatDate(sub.currentPeriodEnd) : '—';
@@ -190,8 +198,7 @@ export default function SettingsPage() {
       />
 
       <Disclaimer>
-        This is a demonstration workspace. Profile, organization, and billing details are sample
-        data, not a live account.
+        Billing and usage figures below are sample data until you connect a payment provider.
       </Disclaimer>
 
       <Tabs defaultValue="profile">
@@ -218,23 +225,23 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-4">
                     <Avatar className="h-16 w-16">
                       <AvatarFallback className="text-lg">
-                        {initials(CURRENT_USER.fullName)}
+                        {initials(user.fullName)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
                       <div className="text-base font-semibold text-foreground">
-                        {CURRENT_USER.fullName}
+                        {user.fullName}
                       </div>
                       <Badge variant="secondary" className="mt-1">
-                        {CURRENT_USER.role}
+                        {user.role}
                       </Badge>
                     </div>
                   </div>
                   <Separator />
                   <div className="space-y-3 text-sm">
-                    <InfoRow icon={User} label="Full name" value={CURRENT_USER.fullName} />
-                    <InfoRow icon={ShieldCheck} label="Role" value={CURRENT_USER.role} />
-                    <InfoRow icon={Mail} label="Email" value={CURRENT_USER.email} />
+                    <InfoRow icon={User} label="Full name" value={user.fullName} />
+                    <InfoRow icon={ShieldCheck} label="Role" value={user.role} />
+                    <InfoRow icon={Mail} label="Email" value={user.email} />
                   </div>
                 </CardContent>
               </Card>
@@ -248,10 +255,10 @@ export default function SettingsPage() {
                   <InfoRow
                     icon={Building2}
                     label="Organization"
-                    value={CURRENT_USER.organization}
+                    value={user.organization}
                   />
-                  <InfoRow icon={Factory} label="Industry" value={CURRENT_USER.industry} />
-                  <InfoRow icon={Users} label="Company size" value={CURRENT_USER.companySize} />
+                  <InfoRow icon={Factory} label="Industry" value={user.industry} />
+                  <InfoRow icon={Users} label="Company size" value={user.companySize} />
                 </CardContent>
               </Card>
             </div>
