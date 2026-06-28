@@ -1,83 +1,78 @@
-// ── Payments (processor-agnostic interface, Polar MoR adapter) ────────────
+// ── Payments — processor-agnostic interface (Stripe + Polar adapters) ─────
 //
-// IRAssist bills through a Merchant-of-Record (Polar) by default — per the
-// no-entity / MoR rail, so no registered company is needed and global tax +
-// compliance is the MoR's job. The whole app talks to the small interface
-// below; swapping to Stripe means writing one more adapter, nothing else.
-//
-// Inert until configured: with no POLAR_ACCESS_TOKEN the app runs in demo mode
-// (pricing shows, "upgrade" explains setup) and never calls out.
-//
-// ⚠ The one outbound Polar call (createCheckoutUrl) is isolated below and
-//   flagged PENDING-LIVE-TEST — confirm it against a Polar sandbox the first
-//   time real keys are present.
+// PAYMENTS_PROVIDER selects the adapter ('stripe' or 'polar'). The whole app
+// talks to the small surface below; swapping providers is one env var + the
+// matching keys. Inert until configured (demo mode otherwise).
 
 import type { BillingPeriod, PlanId } from './plans';
 
-const PROVIDER = (process.env.PAYMENTS_PROVIDER || 'polar') as 'polar' | 'stripe';
+const PROVIDER = (process.env.PAYMENTS_PROVIDER || 'polar') as 'stripe' | 'polar';
 
-function polarApiBase(): string {
-  return process.env.POLAR_SERVER === 'production'
-    ? 'https://api.polar.sh'
-    : 'https://sandbox-api.polar.sh';
-}
-
-/** Map a plan + period to the processor's price/product id (set via env). */
-function priceIdFor(planId: PlanId, period: BillingPeriod): string | undefined {
-  const key = `POLAR_PRICE_${planId.toUpperCase()}_${period.toUpperCase()}`;
-  return process.env[key];
-}
-
-/** True when a real billing backend is wired (otherwise the app is in demo mode). */
 export function isBillingConfigured(): boolean {
-  if (PROVIDER === 'polar') {
-    return Boolean(process.env.POLAR_ACCESS_TOKEN);
-  }
-  return Boolean(process.env.STRIPE_SECRET_KEY);
+  return PROVIDER === 'stripe'
+    ? Boolean(process.env.STRIPE_SECRET_KEY)
+    : Boolean(process.env.POLAR_ACCESS_TOKEN);
 }
 
 export function billingProviderName(): string {
-  return PROVIDER === 'polar' ? 'Polar (Merchant of Record)' : 'Stripe';
+  return PROVIDER === 'stripe' ? 'Stripe' : 'Polar (Merchant of Record)';
+}
+
+/** Plan + period → the processor's price id (set via env). */
+function priceIdFor(planId: PlanId, period: BillingPeriod): string | undefined {
+  const prefix = PROVIDER === 'stripe' ? 'STRIPE_PRICE' : 'POLAR_PRICE';
+  return process.env[`${prefix}_${planId.toUpperCase()}_${period.toUpperCase()}`];
 }
 
 export type CheckoutResult =
   | { ok: true; url: string }
   | { ok: false; reason: 'not_configured' | 'no_price' | 'error'; message: string };
 
-/**
- * Create a hosted checkout session for a plan and return its URL.
- * PENDING-LIVE-TEST: the Polar request shape is per their documented
- * /v1/checkouts API — verify against a sandbox on first run with real keys.
- */
 export async function createCheckoutUrl(opts: {
   planId: PlanId;
   period: BillingPeriod;
   successUrl: string;
+  cancelUrl?: string;
   customerEmail?: string;
+  orgId?: string;
 }): Promise<CheckoutResult> {
   if (!isBillingConfigured()) {
-    return {
-      ok: false,
-      reason: 'not_configured',
-      message: 'Billing is not configured yet. Add billing keys to enable checkout.',
-    };
+    return { ok: false, reason: 'not_configured', message: 'Billing is not configured yet.' };
   }
-
   const priceId = priceIdFor(opts.planId, opts.period);
   if (!priceId) {
-    return {
-      ok: false,
-      reason: 'no_price',
-      message: `No price id configured for ${opts.planId}/${opts.period}.`,
-    };
+    return { ok: false, reason: 'no_price', message: `No price id for ${opts.planId}/${opts.period}.` };
   }
 
-  if (PROVIDER !== 'polar') {
-    return { ok: false, reason: 'error', message: 'Stripe adapter not wired yet.' };
+  if (PROVIDER === 'stripe') {
+    try {
+      const { getStripe } = await import('./stripe');
+      const stripe = getStripe();
+      const metadata = { org_id: opts.orgId ?? '', plan: opts.planId };
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: opts.successUrl,
+        cancel_url: opts.cancelUrl ?? opts.successUrl,
+        customer_email: opts.customerEmail,
+        client_reference_id: opts.orgId,
+        metadata,
+        subscription_data: { metadata },
+        allow_promotion_codes: true,
+      });
+      return session.url
+        ? { ok: true, url: session.url }
+        : { ok: false, reason: 'error', message: 'Stripe returned no checkout url.' };
+    } catch (e) {
+      return { ok: false, reason: 'error', message: e instanceof Error ? e.message : 'Stripe error' };
+    }
   }
 
+  // Polar (Merchant of Record) adapter.
   try {
-    const res = await fetch(`${polarApiBase()}/v1/checkouts/`, {
+    const base =
+      process.env.POLAR_SERVER === 'production' ? 'https://api.polar.sh' : 'https://sandbox-api.polar.sh';
+    const res = await fetch(`${base}/v1/checkouts/`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.POLAR_ACCESS_TOKEN}`,
@@ -89,23 +84,19 @@ export async function createCheckoutUrl(opts: {
         ...(opts.customerEmail ? { customer_email: opts.customerEmail } : {}),
       }),
     });
-
     if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      return { ok: false, reason: 'error', message: `Checkout failed (${res.status}): ${detail.slice(0, 200)}` };
+      return { ok: false, reason: 'error', message: `Polar checkout failed (${res.status}).` };
     }
-
     const data = (await res.json()) as { url?: string };
-    if (!data.url) {
-      return { ok: false, reason: 'error', message: 'Checkout response had no url.' };
-    }
-    return { ok: true, url: data.url };
+    return data.url
+      ? { ok: true, url: data.url }
+      : { ok: false, reason: 'error', message: 'Polar returned no url.' };
   } catch (e) {
-    return { ok: false, reason: 'error', message: e instanceof Error ? e.message : 'Unknown error' };
+    return { ok: false, reason: 'error', message: e instanceof Error ? e.message : 'Polar error' };
   }
 }
 
-/** Customer portal (manage / cancel). Returns null until billing is live. */
+/** Customer portal (manage / cancel). Null until configured. */
 export function customerPortalUrl(): string | null {
-  return process.env.POLAR_CUSTOMER_PORTAL_URL || null;
+  return process.env.STRIPE_CUSTOMER_PORTAL_URL || process.env.POLAR_CUSTOMER_PORTAL_URL || null;
 }

@@ -57,7 +57,7 @@ import Link from 'next/link';
 import { formatDate, initials } from '@/lib/utils';
 import { getProfile, getSubscription } from '@/lib/data/db';
 import { getPlan, formatPrice } from '@/lib/billing/plans';
-import { customerPortalUrl } from '@/lib/billing/payments';
+import { customerPortalUrl, isBillingConfigured } from '@/lib/billing/payments';
 
 export const metadata: Metadata = { title: 'Settings' };
 
@@ -198,7 +198,9 @@ export default async function SettingsPage() {
       />
 
       <Disclaimer>
-        Billing and usage figures below are sample data until you connect a payment provider.
+        {isBillingConfigured()
+          ? 'Your plan and billing are live (Stripe). Usage figures below are illustrative until metering is wired in.'
+          : 'Billing and usage figures below are sample data until you connect a payment provider.'}
       </Disclaimer>
 
       <Tabs defaultValue="profile">

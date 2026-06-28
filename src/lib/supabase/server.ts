@@ -36,3 +36,18 @@ export async function createClient() {
     }
   );
 }
+
+/**
+ * Service-role client. Bypasses RLS. Server-only, trusted contexts ONLY
+ * (webhooks, admin tasks). Never expose to the browser.
+ */
+export function createServiceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY / URL not set — cannot create service client.');
+  }
+  return createServerClient(url, key, {
+    cookies: { getAll: () => [], setAll: () => {} },
+  });
+}
