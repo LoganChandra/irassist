@@ -51,22 +51,40 @@ export interface Hearing {
 }
 
 // ── Industrial Court awards (research module) ────────────────────────────
+// Every award is classified against the Termination Index (see
+// src/lib/data/termination-index.ts) and its detail view renders the seven
+// compilation headings in fixed order:
+//   1. TYPE OF DISMISSAL
+//   2. INDUSTRIAL COURT CASE NO
+//   3. BACKGROUND OF THE CASE
+//   4. CLAIMANT CASE
+//   5. COMPANY CASE
+//   6. COURT FINDINGS
+//   7. LEGAL SUMMARY
+
+import type { MisconductType, TerminationIndex } from '@/lib/data/termination-index';
 
 export interface Award {
   id: string;
   title: string; // "G4S Security Services (M) Sdn Bhd v R. Suresh"
-  topics: IssueType[] | string[];
+  terminationIndex: TerminationIndex[]; // ≥1 entry from the fixed index
+  misconductTypes?: MisconductType[]; // required for Misconduct awards
   awardDate: string; // ISO
   court: string; // "Kuala Lumpur"
-  caseNo: string; // "I.C. No. 588/2022"
+  caseNo: string; // "I.C. No. 588/2022"  (heading 2)
   industry: string;
   employmentLevel: string;
   representation: string;
   outcome: string;
+  // ── the seven compilation headings ────────────────────────────────────
+  typeOfDismissal: string;      // 1. TYPE OF DISMISSAL
+  backgroundOfCase: string;     // 3. BACKGROUND OF THE CASE
+  claimantCase: string;         // 4. CLAIMANT CASE
+  companyCase: string;          // 5. COMPANY CASE
+  courtFindings: string;        // 6. COURT FINDINGS
+  legalSummary: string;         // 7. LEGAL SUMMARY
+  // derived/auxiliary prose kept for search + related-award cards
   summary: string;
-  facts: string;
-  issues: string;
-  decision: string;
   keyTakeaways: string[];
   principles: string[];
   judgmentUrl: string;

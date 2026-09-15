@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   Bookmark,
   FileText,
-  CheckCircle2,
   Scale,
   MessageSquare,
 } from 'lucide-react';
@@ -18,9 +17,6 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { EmptyState } from '@/components/ui/empty-state';
 import { Disclaimer } from '@/components/ui/disclaimer';
 import { AWARDS, getAwardById } from '@/lib/data';
 import { formatDate } from '@/lib/utils';
@@ -74,12 +70,24 @@ export default async function AwardDetailPage({
   const award = getAwardById(id);
   if (!award) notFound();
 
-  // Normalise topics to plain strings (the field is IssueType[] | string[]).
-  const topics = award.topics as string[];
-  const topicSet = new Set(topics);
+  // Normalise index/misconduct to plain strings.
+  const index = award.terminationIndex;
+  const misconduct = award.misconductTypes ?? [];
+  const topicSet = new Set(index);
   const related = AWARDS.filter(
-    (a) => a.id !== award.id && (a.topics as string[]).some((t) => topicSet.has(t))
+    (a) => a.id !== award.id && a.terminationIndex.some((t) => topicSet.has(t))
   ).slice(0, 3);
+
+  /** The seven compilation headings, in fixed order (per the template). */
+  const SEVEN_HEADINGS: { n: number; label: string; text: string }[] = [
+    { n: 1, label: 'Type of Dismissal', text: award.typeOfDismissal },
+    { n: 2, label: 'Industrial Court Case No', text: award.caseNo },
+    { n: 3, label: 'Background of the Case', text: award.backgroundOfCase },
+    { n: 4, label: 'Claimant Case', text: award.claimantCase },
+    { n: 5, label: 'Company Case', text: award.companyCase },
+    { n: 6, label: 'Court Findings', text: award.courtFindings },
+    { n: 7, label: 'Legal Summary', text: award.legalSummary },
+  ];
 
   return (
     <div className="space-y-6">
@@ -99,9 +107,14 @@ export default async function AwardDetailPage({
             </span>
             <div className="min-w-0">
               <div className="flex flex-wrap gap-1.5">
-                {topics.map((t) => (
+                {index.map((t) => (
                   <Badge key={t} variant="secondary">
                     {t}
+                  </Badge>
+                ))}
+                {misconduct.map((m) => (
+                  <Badge key={m} variant="outline" className="text-muted-foreground">
+                    {m}
                   </Badge>
                 ))}
               </div>
@@ -137,77 +150,27 @@ export default async function AwardDetailPage({
       <Disclaimer />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main column */}
+        {/* Main column — the seven compilation headings, in order */}
         <div className="space-y-6 lg:col-span-2">
-          <Card className="overflow-hidden">
-            <Tabs defaultValue="summary">
-              <TabsList className="w-full overflow-x-auto px-3 scrollbar-thin">
-                <TabsTrigger value="summary">Summary</TabsTrigger>
-                <TabsTrigger value="facts">Facts</TabsTrigger>
-                <TabsTrigger value="issues">Issues</TabsTrigger>
-                <TabsTrigger value="decision">Decision</TabsTrigger>
-                <TabsTrigger value="principles">Principles</TabsTrigger>
-                <TabsTrigger value="comments">Comments</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="summary" className="mt-0 space-y-6 p-6">
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Summary
-                  </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-foreground/90">
-                    {award.summary}
+          <Card>
+            <CardContent className="divide-y divide-border p-0">
+              {SEVEN_HEADINGS.map((h) => (
+                <section
+                  key={h.n}
+                  className="grid gap-1 px-6 py-5 sm:grid-cols-[240px_1fr] sm:gap-6"
+                >
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                      {String(h.n).padStart(2, '0')}
+                    </p>
+                    <h3 className="mt-1 text-sm font-semibold text-foreground">{h.label}</h3>
+                  </div>
+                  <p className="text-sm leading-relaxed text-foreground/90">
+                    {h.text || <span className="italic text-muted-foreground">Not recorded</span>}
                   </p>
-                </div>
-                <Separator />
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Key Takeaways</h3>
-                  <ul className="mt-3 space-y-2.5">
-                    {award.keyTakeaways.map((k) => (
-                      <li key={k} className="flex gap-2.5 text-sm text-muted-foreground">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
-                        <span className="leading-relaxed">{k}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="facts" className="mt-0 p-6">
-                <ProseTab label="Facts" text={award.facts} />
-              </TabsContent>
-
-              <TabsContent value="issues" className="mt-0 p-6">
-                <ProseTab label="Issues" text={award.issues} />
-              </TabsContent>
-
-              <TabsContent value="decision" className="mt-0 p-6">
-                <ProseTab label="Decision" text={award.decision} />
-              </TabsContent>
-
-              <TabsContent value="principles" className="mt-0 p-6">
-                <h3 className="text-sm font-semibold text-foreground">Legal Principles</h3>
-                <ul className="mt-3 space-y-3">
-                  {award.principles.map((p, i) => (
-                    <li key={p} className="flex gap-3">
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                        {i + 1}
-                      </span>
-                      <span className="text-sm leading-relaxed text-muted-foreground">{p}</span>
-                    </li>
-                  ))}
-                </ul>
-              </TabsContent>
-
-              <TabsContent value="comments" className="mt-0 p-6">
-                <EmptyState
-                  icon={MessageSquare}
-                  title="No comments yet"
-                  description="Notes and discussion your team adds to this award will appear here."
-                  className="border-0 bg-transparent py-10"
-                />
-              </TabsContent>
-            </Tabs>
+                </section>
+              ))}
+            </CardContent>
           </Card>
         </div>
 
@@ -264,7 +227,7 @@ export default async function AwardDetailPage({
                 <Card className="h-full transition-all hover:border-primary/40 hover:shadow-md">
                   <CardContent className="p-5">
                     <div className="flex flex-wrap gap-1.5">
-                      {(r.topics as string[]).slice(0, 2).map((t) => (
+                      {r.terminationIndex.slice(0, 2).map((t) => (
                         <Badge key={t} variant="outline">
                           {t}
                         </Badge>

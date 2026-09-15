@@ -19,22 +19,19 @@ import {
 } from '@/components/ui/select';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { Award } from '@/lib/types';
+import {
+  MISCONDUCT_TYPES,
+  TERMINATION_INDEX,
+  type MisconductType,
+  type TerminationIndex,
+} from '@/lib/data/termination-index';
 import { cn, formatDate } from '@/lib/utils';
 
-/** Topic facets offered in the filters rail. */
-const TOPICS = [
-  'Misconduct',
-  'Dishonesty',
-  'Performance Issue',
-  'Insubordination',
-  'Attendance',
-  'Absenteeism',
-  'Harassment',
-  'Policy Violation',
-] as const;
+/** Termination Index facets offered in the filters rail — the fixed index. */
+const TOPICS: readonly TerminationIndex[] = TERMINATION_INDEX;
 
 /** Quick popular-search chips that seed the query. */
-const POPULAR = ['Misconduct', 'Dismissal', 'Attendance', 'Domestic Inquiry', 'Retrenchment'];
+const POPULAR = [...TERMINATION_INDEX.slice(0, 4), 'Domestic Inquiry', 'Retrenchment'];
 
 type SortKey = 'relevance' | 'date';
 
@@ -43,6 +40,7 @@ const slug = (s: string) => 'topic-' + s.toLowerCase().replace(/\s+/g, '-');
 export function AwardsSearch({ awards }: { awards: Award[] }) {
   const [query, setQuery] = useState('');
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [selectedMisconduct, setSelectedMisconduct] = useState<string[]>([]);
   const [industry, setIndustry] = useState('all');
   const [court, setCourt] = useState('all');
   const [sort, setSort] = useState<SortKey>('relevance');
@@ -60,16 +58,36 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = awards.filter((a) => {
-      const matchesQuery =
-        !q ||
-        a.title.toLowerCase().includes(q) ||
-        a.summary.toLowerCase().includes(q) ||
-        a.topics.some((t) => t.toLowerCase().includes(q));
+      const haystack = [
+        a.title,
+        a.summary,
+        a.typeOfDismissal,
+        a.backgroundOfCase,
+        a.claimantCase,
+        a.companyCase,
+        a.courtFindings,
+        a.legalSummary,
+        ...a.terminationIndex,
+        ...(a.misconductTypes ?? []),
+      ].join(' ').toLowerCase();
+      const matchesQuery = !q || haystack.includes(q);
       const matchesTopics =
-        selectedTopics.length === 0 || a.topics.some((t) => selectedTopics.includes(t));
+        selectedTopics.length === 0 ||
+        selectedTopics.some((t) => a.terminationIndex.includes(t as TerminationIndex));
+      const matchesMisconduct =
+        selectedMisconduct.length === 0 ||
+        selectedMisconduct.some((m) =>
+          (a.misconductTypes ?? []).includes(m as MisconductType)
+        );
       const matchesIndustry = industry === 'all' || a.industry === industry;
       const matchesCourt = court === 'all' || a.court === court;
-      return matchesQuery && matchesTopics && matchesIndustry && matchesCourt;
+      return (
+        matchesQuery &&
+        matchesTopics &&
+        matchesMisconduct &&
+        matchesIndustry &&
+        matchesCourt
+      );
     });
 
     const byDate = (a: Award, b: Award) => +new Date(b.awardDate) - +new Date(a.awardDate);
@@ -80,19 +98,28 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
     const score = (a: Award) => {
       let s = 0;
       if (a.title.toLowerCase().includes(q)) s += 10;
-      if (a.topics.some((t) => t.toLowerCase().includes(q))) s += 6;
+      if (a.terminationIndex.some((t) => t.toLowerCase().includes(q))) s += 6;
       if (a.summary.toLowerCase().includes(q)) s += 3;
       return s;
     };
     return [...filtered].sort((a, b) => score(b) - score(a) || byDate(a, b));
-  }, [awards, query, selectedTopics, industry, court, sort]);
+  }, [awards, query, selectedTopics, selectedMisconduct, industry, court, sort]);
 
   const hasActiveFilters =
-    selectedTopics.length > 0 || industry !== 'all' || court !== 'all';
+    selectedTopics.length > 0 ||
+    selectedMisconduct.length > 0 ||
+    industry !== 'all' ||
+    court !== 'all';
 
   function toggleTopic(t: string) {
     setSelectedTopics((prev) =>
       prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
+    );
+  }
+
+  function toggleMisconduct(m: string) {
+    setSelectedMisconduct((prev) =>
+      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]
     );
   }
 
@@ -104,6 +131,7 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
 
   function clearFilters() {
     setSelectedTopics([]);
+    setSelectedMisconduct([]);
     setIndustry('all');
     setCourt('all');
   }
@@ -179,7 +207,7 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
             {/* Topic checkboxes */}
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Topic
+                Termination Index
               </p>
               <div className="space-y-2.5">
                 {TOPICS.map((t) => (
@@ -195,6 +223,27 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
                   </div>
                 ))}
               </div>
+
+              {/* Misconduct sub-types — visible under the Misconduct arm */
+              selectedTopics.includes('Misconduct') && (
+                <div className="ml-1 mt-1 space-y-2.5 border-l-2 border-border pl-3">
+                  {MISCONDUCT_TYPES.map((m) => (
+                    <div key={m} className="flex items-center gap-2.5">
+                      <Checkbox
+                        id={slug('m-' + m)}
+                        checked={selectedMisconduct.includes(m)}
+                        onCheckedChange={() => toggleMisconduct(m)}
+                      />
+                      <Label
+                        htmlFor={slug('m-' + m)}
+                        className="cursor-pointer text-[13px] font-normal text-muted-foreground"
+                      >
+                        {m}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <Separator />
@@ -293,9 +342,14 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
                     <CardContent className="flex gap-4 p-5">
                       <div className="min-w-0 flex-1 space-y-2.5">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          {a.topics.map((t) => (
+                          {a.terminationIndex.map((t) => (
                             <Badge key={t} variant="secondary">
                               {t}
+                            </Badge>
+                          ))}
+                          {(a.misconductTypes ?? []).map((m) => (
+                            <Badge key={m} variant="outline" className="text-muted-foreground">
+                              {m}
                             </Badge>
                           ))}
                         </div>
