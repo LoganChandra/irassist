@@ -57,3 +57,7 @@ create index if not exists awards_termination_index_idx
   on awards using gin (termination_index);
 create index if not exists awards_case_no_idx
   on awards (case_no);
+
+-- the loader (scripts/load-awards.mjs) upserts keyed on case_no
+alter table awards
+  add constraint awards_case_no_unique unique (case_no);
