@@ -154,14 +154,13 @@ export async function searchAwards(query: AwardsQuery): Promise<AwardsResult> {
 export async function getAwardByIdDb(id: string): Promise<Award | null> {
   if (!hasValidSupabaseConfig()) return AWARDS.find((a) => a.id.toLowerCase() === id.toLowerCase()) ?? null;
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('awards')
-    .select('*')
-    .or(`case_no.eq.${id},id.eq.${id}`)
-    .maybeSingle();
+  // PostgREST or-syntax breaks on commas/parens in values — use exact eq filters instead.
+  const { data, error } = await supabase.from('awards').select('*').eq('id', id).maybeSingle();
   if (error || !data) {
     if (error) console.error('[getAwardByIdDb]', error.message);
-    return null;
+    // Backend dead or record absent → serve the seed copy when we have one,
+    // so detail pages never 404 just because the database is unreachable.
+    return AWARDS.find((a) => a.id.toLowerCase() === id.toLowerCase()) ?? null;
   }
   return mapRow(data);
 }
