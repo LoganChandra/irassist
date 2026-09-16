@@ -1,7 +1,12 @@
 import { type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
+import { enforceIpAllowlist } from '@/lib/security/ip';
 
 export async function middleware(request: NextRequest) {
+  // Network gate first — nothing (auth included) is reachable off-list.
+  const blocked = enforceIpAllowlist(request);
+  if (blocked) return blocked;
+
   return await updateSession(request);
 }
 
