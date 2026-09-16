@@ -28,7 +28,7 @@ export default function SignupPage() {
     setLoading(true);
 
     if (isDemoMode()) {
-      router.push('/dashboard');
+      router.push('/awards');
       return;
     }
 
@@ -49,7 +49,7 @@ export default function SignupPage() {
       return;
     }
     if (data.session) {
-      router.push('/dashboard');
+      router.push('/awards');
       router.refresh();
     } else {
       // Email confirmation required (if autoconfirm is later turned off).

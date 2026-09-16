@@ -1,22 +1,11 @@
-import type { LucideIcon } from 'lucide-react';
-import {
-  LayoutDashboard,
-  Briefcase,
-  Gavel,
-  FileSearch,
-  TrendingUp,
-  Sparkles,
-  FileText,
-  Scale,
-  Calculator,
-  BarChart3,
-  Settings,
-} from 'lucide-react';
+import { Sparkles, FileText, Scale } from 'lucide-react';
 
 export interface NavItem {
   label: string;
   href: string;
-  icon: LucideIcon;
+  icon: typeof Scale;
+  /** Optional accent hue for the active indicator + icon. */
+  tone?: 'blue' | 'gold';
 }
 
 export interface NavSection {
@@ -26,29 +15,11 @@ export interface NavSection {
 
 export const NAV: NavSection[] = [
   {
-    heading: 'Caseload',
-    items: [
-      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-      { label: 'Cases', href: '/cases', icon: Briefcase },
-      { label: 'Disciplinary', href: '/disciplinary', icon: Gavel },
-      { label: 'Investigation', href: '/investigation', icon: FileSearch },
-      { label: 'PIP', href: '/pip', icon: TrendingUp },
-    ],
-  },
-  {
     heading: 'Knowledge',
     items: [
-      { label: 'AI Assistant', href: '/assistant', icon: Sparkles },
-      { label: 'Templates', href: '/templates', icon: FileText },
-      { label: 'Awards Data Bank', href: '/awards', icon: Scale },
-      { label: 'Tools', href: '/tools', icon: Calculator },
-    ],
-  },
-  {
-    heading: 'Insights',
-    items: [
-      { label: 'Reports', href: '/reports', icon: BarChart3 },
-      { label: 'Settings', href: '/settings', icon: Settings },
+      { label: 'Awards Data Bank', href: '/awards', icon: Scale, tone: 'gold' },
+      { label: 'AI Assistant', href: '/assistant', icon: Sparkles, tone: 'blue' },
+      { label: 'Templates', href: '/templates', icon: FileText, tone: 'blue' },
     ],
   },
 ];

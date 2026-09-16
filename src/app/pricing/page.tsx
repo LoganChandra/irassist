@@ -30,7 +30,7 @@ export default async function PricingPage({
               <Link href="/login">Log in</Link>
             </Button>
             <Button asChild size="sm">
-              <Link href="/dashboard">Open workspace</Link>
+              <Link href="/awards">Open workspace</Link>
             </Button>
           </div>
         </div>

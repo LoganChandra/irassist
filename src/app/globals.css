@@ -4,13 +4,14 @@
 
 /*
   IR Assist design tokens.
-  Light product surface (white/slate) with a deep-navy workspace sidebar and a
-  confident corporate blue as primary. Status hues drive case badges.
+  Light product surface (warm paper white) with a deep-navy workspace sidebar,
+  a confident corporate blue as primary, and a muted gold "knowledge" accent.
+  Status hues drive case badges. Depth comes from layered shadows, not borders.
 */
 :root {
-  --radius: 0.625rem;
+  --radius: 0.75rem;
 
-  --background: 210 40% 98%;
+  --background: 220 33% 97%;
   --foreground: 222 47% 11%;
 
   --card: 0 0% 100%;
@@ -40,17 +41,21 @@
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
+  --border: 214 30% 90%;
+  --input: 214 30% 90%;
   --ring: 221 83% 53%;
 
-  /* Deep-navy workspace sidebar */
-  --sidebar: 222 47% 11%;
-  --sidebar-foreground: 214 32% 82%;
-  --sidebar-muted: 215 25% 60%;
-  --sidebar-accent: 221 83% 53%;
+  /* Deep-navy workspace sidebar — near-black blue, never pure black */
+  --sidebar: 222 47% 8%;
+  --sidebar-foreground: 214 25% 78%;
+  --sidebar-muted: 217 18% 52%;
+  --sidebar-accent: 221 83% 60%;
   --sidebar-accent-foreground: 0 0% 100%;
-  --sidebar-border: 217 33% 20%;
+  --sidebar-border: 219 35% 17%;
+  --sidebar-card: 222 45% 12%;
+
+  /* Gold "knowledge" accent — used only in the Knowledge nav rail */
+  --gold: 42 78% 62%;
 
   /* Brand */
   --brand: 221 83% 53%;
@@ -88,19 +93,21 @@
   --color-sidebar-accent: hsl(var(--sidebar-accent));
   --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
   --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-card: hsl(var(--sidebar-card));
+  --color-gold: hsl(var(--gold));
 
   --color-brand: hsl(var(--brand));
   --color-brand-deep: hsl(var(--brand-deep));
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 3px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  /* Editorial serif for display headings — professional gravitas, zero cost. */
-  --font-serif: Georgia, 'Times New Roman', ui-serif, serif;
-  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* Editorial serif for display headings — professional gravitas. */
+  --font-serif: var(--font-editorial), Georgia, 'Times New Roman', ui-serif, serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
 * {
@@ -169,4 +176,121 @@ body {
 }
 .animate-fade-in {
   animation: fade-in 0.4s ease-out both;
+}
+
+/* ── Premium layer ──────────────────────────────────────────────────────── */
+
+/* Elevation — layered, soft, never gray-on-gray mud */
+.elev-sm {
+  box-shadow:
+    0 1px 2px hsl(222 47% 11% / 0.05),
+    0 1px 3px hsl(222 47% 11% / 0.04);
+}
+.elev-md {
+  box-shadow:
+    0 2px 4px hsl(222 47% 11% / 0.04),
+    0 8px 24px hsl(222 47% 11% / 0.07);
+}
+.elev-lg {
+  box-shadow:
+    0 4px 8px hsl(222 47% 11% / 0.04),
+    0 16px 48px hsl(222 47% 11% / 0.1);
+}
+
+/* Card physics — 1px hover lift, 0.97 press, spring-feel timing */
+.card-lift {
+  transition:
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.25s ease;
+}
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 2px 4px hsl(222 47% 11% / 0.05),
+    0 12px 32px hsl(222 47% 11% / 0.1);
+}
+.card-lift:active {
+  transform: translateY(0) scale(0.99);
+}
+
+/* Staggered entrance for lists of cards — applied with inline --stagger */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise-in {
+  animation: rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--stagger, 0ms);
+}
+
+/* Skeleton shimmer — directional light sweep, subtler than a flat pulse */
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: hsl(var(--muted));
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--foreground) / 0.05),
+    transparent
+  );
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}
+
+/* Ambient page wash — a barely-there top glow so the light surface isn't flat */
+.ambient-wash {
+  background:
+    radial-gradient(1200px 400px at 70% -10%, hsl(var(--primary) / 0.05), transparent 60%),
+    hsl(var(--background));
+}
+
+/* Sidebar ambience — one signature decorative moment: a slow aurora in the navy */
+.sidebar-aurora {
+  background:
+    radial-gradient(600px 300px at 20% -5%, hsl(var(--sidebar-accent) / 0.12), transparent 65%),
+    radial-gradient(500px 320px at 90% 110%, hsl(var(--gold) / 0.05), transparent 60%),
+    hsl(var(--sidebar));
+}
+
+/* Nav active indicator — left rail bar that scales in */
+.nav-active-bar {
+  transform-origin: top;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Press feedback for buttons globally (Bolt.new touch) */
+button:not([disabled]),
+[role='button']:not([disabled]) {
+  transition: transform 0.1s ease;
+}
+button:not([disabled]):active,
+[role='button']:not([disabled]):active {
+  transform: scale(0.97);
 }

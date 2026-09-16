@@ -106,7 +106,7 @@ export default function LandingPage() {
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline">
-                <Link href="/dashboard">Open the workspace</Link>
+                <Link href="/assistant">Open the workspace</Link>
               </Button>
             </div>
             <p className="mt-4 text-xs text-muted-foreground">
@@ -258,12 +258,12 @@ export default function LandingPage() {
             Make confident, legally-sound IR decisions
           </h2>
           <p className="max-w-md text-muted-foreground">
-            Start managing your caseload today. No setup — explore the full workspace with sample
-            data.
+            Browse the awards data bank, draft from templates, and ask the AI assistant — no setup
+            required.
           </p>
           <Button asChild size="lg">
-            <Link href="/dashboard">
-              Open the workspace <ArrowRight className="h-4 w-4" />
+            <Link href="/awards">
+              Explore the data bank <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
         </div>

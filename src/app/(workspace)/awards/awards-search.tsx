@@ -329,13 +329,14 @@ export function AwardsSearch({ result, query, facets }: Props) {
             </EmptyState>
           ) : (
             <>
-              <div className={cn('space-y-4', pending && 'opacity-60')}>
-                {result.awards.map((a) => {
+              <div className={cn('space-y-4', pending && 'opacity-60 transition-opacity duration-200')}>
+                {result.awards.map((a, idx) => {
                   const isBookmarked = bookmarked.includes(a.id);
                   return (
                     <Card
                       key={a.id}
-                      className="transition-all hover:border-primary/30 hover:shadow-md"
+                      className="card-lift transition-all hover:border-primary/30"
+                      style={{ ['--stagger' as string]: `${Math.min(idx, 8) * 50}ms` }}
                     >
                       <CardContent className="flex gap-4 p-5">
                         <div className="min-w-0 flex-1 space-y-2.5">

@@ -25,13 +25,13 @@ export default async function WorkspaceLayout({
   return (
     <div className="flex min-h-screen bg-background">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-sidebar md:flex">
-        <div className="flex h-16 items-center border-b border-sidebar-border px-5">
+      <aside className="sidebar-aurora fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-sidebar-border md:flex">
+        <div className="flex h-16 items-center border-b border-sidebar-border/60 px-5">
           <Logo variant="dark" withTagline />
         </div>
         <SidebarNav />
         {isDemoMode() && (
-          <div className="border-t border-sidebar-border px-4 py-3">
+          <div className="border-t border-sidebar-border/60 px-4 py-3">
             <p className="text-[11px] leading-snug text-sidebar-muted">
               <span className="font-semibold text-sidebar-foreground">Demo mode</span> · seeded
               data, no sign-in required.
@@ -43,7 +43,7 @@ export default async function WorkspaceLayout({
       {/* Main column */}
       <div className="flex min-h-screen flex-1 flex-col md:pl-64">
         <Topbar user={user} />
-        <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
+        <main className="ambient-wash flex-1 px-4 py-6 md:px-8 md:py-8">
           <div className="mx-auto w-full max-w-7xl animate-fade-in">{children}</div>
         </main>
       </div>

@@ -5,13 +5,13 @@ export function SocialButtons() {
   return (
     <div className="grid gap-2.5">
       <Link
-        href="/dashboard"
+        href="/awards"
         className="flex h-10 items-center justify-center gap-2.5 rounded-md border border-input bg-card text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-secondary"
       >
         <MicrosoftIcon /> Continue with Microsoft
       </Link>
       <Link
-        href="/dashboard"
+        href="/awards"
         className="flex h-10 items-center justify-center gap-2.5 rounded-md border border-input bg-card text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-secondary"
       >
         <GoogleIcon /> Continue with Google
