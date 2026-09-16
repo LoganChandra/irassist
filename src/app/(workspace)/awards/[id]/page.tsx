@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Disclaimer } from '@/components/ui/disclaimer';
-import { AWARDS, getAwardById } from '@/lib/data';
+import { getAwardByIdDb } from '@/lib/data/awards-search';
 import { formatDate } from '@/lib/utils';
 
 export async function generateMetadata({
@@ -27,7 +27,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const award = getAwardById(id);
+  const award = await getAwardByIdDb(decodeURIComponent(id));
   return { title: award ? award.title : 'Award' };
 }
 
@@ -61,22 +61,33 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
+/** Related awards sharing a Termination Index label — DB when available. */
+async function getRelatedAwards(
+  award: import('@/lib/types').Award,
+  topics: Set<string>,
+  limit: number
+): Promise<import('@/lib/types').Award[]> {
+  const { searchAwards } = await import('@/lib/data/awards-search');
+  const primary = award.terminationIndex[0];
+  if (!primary) return [];
+  const res = await searchAwards({ topics: [primary], pageSize: limit + 1 });
+  return res.awards.filter((a) => a.id !== award.id).slice(0, limit);
+}
+
 export default async function AwardDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const award = getAwardById(id);
+  const award = await getAwardByIdDb(decodeURIComponent(id));
   if (!award) notFound();
 
   // Normalise index/misconduct to plain strings.
   const index = award.terminationIndex;
   const misconduct = award.misconductTypes ?? [];
   const topicSet = new Set(index);
-  const related = AWARDS.filter(
-    (a) => a.id !== award.id && a.terminationIndex.some((t) => topicSet.has(t))
-  ).slice(0, 3);
+  const related = await getRelatedAwards(award, topicSet, 3);
 
   /** The seven compilation headings, in fixed order (per the template). */
   const SEVEN_HEADINGS: { n: number; label: string; text: string }[] = [

@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Bookmark, SlidersHorizontal, SearchX } from 'lucide-react';
+import { Search, Bookmark, SlidersHorizontal, SearchX, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,169 +19,109 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { EmptyState } from '@/components/ui/empty-state';
-import type { Award } from '@/lib/types';
+import type { AwardsQuery, AwardsResult } from '@/lib/data/awards-search';
 import {
   MISCONDUCT_TYPES,
   TERMINATION_INDEX,
-  type MisconductType,
-  type TerminationIndex,
 } from '@/lib/data/termination-index';
 import { cn, formatDate } from '@/lib/utils';
 
-/** Termination Index facets offered in the filters rail — the fixed index. */
-const TOPICS: readonly TerminationIndex[] = TERMINATION_INDEX;
+/** Termination Index facets offered in the filters rail — the fixed index, verbatim. */
+const TOPICS: readonly string[] = TERMINATION_INDEX;
 
-/** Quick popular-search chips that seed the query. */
-const POPULAR = [...TERMINATION_INDEX.slice(0, 4), 'Domestic Inquiry', 'Retrenchment'];
+interface Props {
+  result: AwardsResult;
+  query: AwardsQuery;
+  facets: { courts: string[]; years: string[] };
+}
 
-type SortKey = 'relevance' | 'date';
+export function AwardsSearch({ result, query, facets }: Props) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [q, setQ] = useState(query.q ?? '');
+  const [showFilters, setShowFilters] = useState(false);
 
-const slug = (s: string) => 'topic-' + s.toLowerCase().replace(/\s+/g, '-');
+  // Keep the input in sync when navigation changes the URL (back/forward).
+  useEffect(() => setQ(query.q ?? ''), [query.q]);
 
-export function AwardsSearch({ awards }: { awards: Award[] }) {
-  const [query, setQuery] = useState('');
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-  const [selectedMisconduct, setSelectedMisconduct] = useState<string[]>([]);
-  const [industry, setIndustry] = useState('all');
-  const [court, setCourt] = useState('all');
-  const [sort, setSort] = useState<SortKey>('relevance');
-  const [bookmarked, setBookmarked] = useState<string[]>([]);
-
-  const industries = useMemo(
-    () => Array.from(new Set(awards.map((a) => a.industry))).sort(),
-    [awards]
-  );
-  const courts = useMemo(
-    () => Array.from(new Set(awards.map((a) => a.court))).sort(),
-    [awards]
-  );
-
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = awards.filter((a) => {
-      const haystack = [
-        a.title,
-        a.summary,
-        a.typeOfDismissal,
-        a.backgroundOfCase,
-        a.claimantCase,
-        a.companyCase,
-        a.courtFindings,
-        a.legalSummary,
-        ...a.terminationIndex,
-        ...(a.misconductTypes ?? []),
-      ].join(' ').toLowerCase();
-      const matchesQuery = !q || haystack.includes(q);
-      const matchesTopics =
-        selectedTopics.length === 0 ||
-        selectedTopics.some((t) => a.terminationIndex.includes(t as TerminationIndex));
-      const matchesMisconduct =
-        selectedMisconduct.length === 0 ||
-        selectedMisconduct.some((m) =>
-          (a.misconductTypes ?? []).includes(m as MisconductType)
-        );
-      const matchesIndustry = industry === 'all' || a.industry === industry;
-      const matchesCourt = court === 'all' || a.court === court;
-      return (
-        matchesQuery &&
-        matchesTopics &&
-        matchesMisconduct &&
-        matchesIndustry &&
-        matchesCourt
-      );
-    });
-
-    const byDate = (a: Award, b: Award) => +new Date(b.awardDate) - +new Date(a.awardDate);
-
-    if (sort === 'date') return [...filtered].sort(byDate);
-    if (!q) return filtered;
-
-    const score = (a: Award) => {
-      let s = 0;
-      if (a.title.toLowerCase().includes(q)) s += 10;
-      if (a.terminationIndex.some((t) => t.toLowerCase().includes(q))) s += 6;
-      if (a.summary.toLowerCase().includes(q)) s += 3;
-      return s;
-    };
-    return [...filtered].sort((a, b) => score(b) - score(a) || byDate(a, b));
-  }, [awards, query, selectedTopics, selectedMisconduct, industry, court, sort]);
+  function navigate(next: Partial<AwardsQuery>) {
+    const merged: AwardsQuery = { ...query, ...next, page: next.page ?? 1 };
+    const sp = new URLSearchParams();
+    if (merged.q?.trim()) sp.set('q', merged.q.trim());
+    if (merged.topics?.length) sp.set('topics', merged.topics.join('|'));
+    if (merged.misconduct?.length) sp.set('misconduct', merged.misconduct.join('|'));
+    if (merged.court && merged.court !== 'all') sp.set('court', merged.court);
+    if (merged.year && merged.year !== 'all') sp.set('year', merged.year);
+    if (merged.sort === 'relevance') sp.set('sort', 'relevance');
+    if ((merged.page ?? 1) > 1) sp.set('page', String(merged.page));
+    startTransition(() => router.push(`/awards?${sp.toString()}`, { scroll: false }));
+  }
 
   const hasActiveFilters =
-    selectedTopics.length > 0 ||
-    selectedMisconduct.length > 0 ||
-    industry !== 'all' ||
-    court !== 'all';
+    (query.topics?.length ?? 0) > 0 ||
+    (query.misconduct?.length ?? 0) > 0 ||
+    (query.court && query.court !== 'all') ||
+    (query.year && query.year !== 'all');
 
   function toggleTopic(t: string) {
-    setSelectedTopics((prev) =>
-      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
-    );
+    const cur = query.topics ?? [];
+    navigate({ topics: cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t] });
   }
-
   function toggleMisconduct(m: string) {
-    setSelectedMisconduct((prev) =>
-      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]
-    );
+    const cur = query.misconduct ?? [];
+    navigate({ misconduct: cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m] });
   }
-
-  function toggleBookmark(id: string) {
-    setBookmarked((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  }
-
   function clearFilters() {
-    setSelectedTopics([]);
-    setSelectedMisconduct([]);
-    setIndustry('all');
-    setCourt('all');
+    navigate({ topics: [], misconduct: [], court: 'all', year: 'all' });
   }
+
+  const slug = (s: string) => 'topic-' + s.toLowerCase().replace(/[^a-z]+/g, '-');
 
   return (
     <div className="space-y-6">
-      {/* Search bar + popular chips */}
+      {/* Search bar */}
       <Card>
         <CardContent className="space-y-4 p-4 sm:p-5">
           <form
-            onSubmit={(e) => e.preventDefault()}
+            onSubmit={(e) => {
+              e.preventDefault();
+              navigate({ q });
+            }}
             className="flex flex-col gap-3 sm:flex-row"
           >
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
               <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search Industrial Court awards, topics, or keywords…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search 8,900+ Industrial Court awards — parties, holdings, keywords…"
                 aria-label="Search awards"
                 className="h-12 pl-11 text-[15px]"
               />
             </div>
-            <Button type="submit" size="lg" className="h-12 px-7 sm:w-auto">
-              <Search className="h-4 w-4" /> Search
+            <Button type="submit" size="lg" className="h-12 px-7" disabled={pending}>
+              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              Search
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="h-12 px-4 lg:hidden"
+              onClick={() => setShowFilters((s) => !s)}
+              aria-expanded={showFilters}
+            >
+              <SlidersHorizontal className="h-4 w-4" /> Filters
+              {hasActiveFilters ? ' ·' : ''}
             </Button>
           </form>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground">Popular:</span>
-            {POPULAR.map((chip) => {
-              const active = query.trim().toLowerCase() === chip.toLowerCase();
-              return (
-                <button
-                  key={chip}
-                  type="button"
-                  onClick={() => setQuery(chip)}
-                  aria-pressed={active}
-                  className={cn(
-                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                    active
-                      ? 'border-primary/40 bg-primary/10 text-primary'
-                      : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
-                  )}
-                >
-                  {chip}
-                </button>
-              );
-            })}
+            <span className="text-xs font-medium text-muted-foreground">
+              {result.mode === 'db'
+                ? `Live corpus · ${result.total.toLocaleString()} awards`
+                : 'Sample corpus (database offline)'}
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -188,7 +129,7 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
       {/* Filters (left) + results (right) */}
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         {/* Filters rail */}
-        <Card className="h-fit lg:sticky lg:top-6">
+        <Card className={cn('h-fit lg:sticky lg:top-6', !showFilters && 'hidden lg:block')}>
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle className="flex items-center gap-2 text-base">
               <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
@@ -204,7 +145,6 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
             </button>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Topic checkboxes */}
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Termination Index
@@ -214,7 +154,7 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
                   <div key={t} className="flex items-center gap-2.5">
                     <Checkbox
                       id={slug(t)}
-                      checked={selectedTopics.includes(t)}
+                      checked={query.topics?.includes(t)}
                       onCheckedChange={() => toggleTopic(t)}
                     />
                     <Label htmlFor={slug(t)} className="cursor-pointer font-normal text-foreground">
@@ -224,14 +164,14 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
                 ))}
               </div>
 
-              {/* Misconduct sub-types — visible under the Misconduct arm */
-              selectedTopics.includes('Misconduct') && (
+              {/* Misconduct sub-types — nested under the Misconduct arm */}
+              {query.topics?.includes('Misconduct') && (
                 <div className="ml-1 mt-1 space-y-2.5 border-l-2 border-border pl-3">
                   {MISCONDUCT_TYPES.map((m) => (
                     <div key={m} className="flex items-center gap-2.5">
                       <Checkbox
                         id={slug('m-' + m)}
-                        checked={selectedMisconduct.includes(m)}
+                        checked={query.misconduct?.includes(m)}
                         onCheckedChange={() => toggleMisconduct(m)}
                       />
                       <Label
@@ -248,40 +188,38 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
 
             <Separator />
 
-            {/* Industry */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Industry
+                Court
               </Label>
-              <Select value={industry} onValueChange={setIndustry}>
+              <Select value={query.court ?? 'all'} onValueChange={(v) => navigate({ court: v })}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All Industries" />
+                  <SelectValue placeholder="All Courts" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Industries</SelectItem>
-                  {industries.map((i) => (
-                    <SelectItem key={i} value={i}>
-                      {i}
+                  <SelectItem value="all">All Courts</SelectItem>
+                  {facets.courts.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Court */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Court
+                Year
               </Label>
-              <Select value={court} onValueChange={setCourt}>
+              <Select value={query.year ?? 'all'} onValueChange={(v) => navigate({ year: v })}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All Courts" />
+                  <SelectValue placeholder="All Years" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Courts</SelectItem>
-                  {courts.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
+                  <SelectItem value="all">All Years</SelectItem>
+                  {facets.years.map((y) => (
+                    <SelectItem key={y} value={y}>
+                      {y}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -294,36 +232,40 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
         <div className="min-w-0 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground" aria-live="polite">
-              About <span className="font-semibold text-foreground">{results.length}</span>{' '}
-              {results.length === 1 ? 'result' : 'results'} found
+              <span className="font-semibold text-foreground">{result.total.toLocaleString()}</span>{' '}
+              {result.total === 1 ? 'award' : 'awards'}
+              {pending && <Loader2 className="ml-2 inline h-3.5 w-3.5 animate-spin" />}
             </p>
             <div className="flex items-center gap-2">
               <span className="hidden text-xs text-muted-foreground sm:inline">Sort by</span>
-              <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+              <Select
+                value={query.sort ?? 'date'}
+                onValueChange={(v) => navigate({ sort: v as 'date' | 'relevance' })}
+              >
                 <SelectTrigger className="h-9 w-[150px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="relevance">Relevance</SelectItem>
                   <SelectItem value="date">Newest first</SelectItem>
+                  <SelectItem value="relevance">Relevance</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {results.length === 0 ? (
+          {result.awards.length === 0 ? (
             <EmptyState
               icon={SearchX}
               title="No awards match your search"
-              description="Try a different keyword, or clear your filters to see more sample awards."
+              description="Try different keywords, or clear the filters to browse the full corpus."
             >
-              {(hasActiveFilters || query.trim()) && (
+              {(hasActiveFilters || query.q?.trim()) && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    clearFilters();
-                    setQuery('');
+                    setQ('');
+                    navigate({ q: '', topics: [], misconduct: [], court: 'all', year: 'all' });
                   }}
                 >
                   Reset search
@@ -331,14 +273,10 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
               )}
             </EmptyState>
           ) : (
-            <div className="space-y-4">
-              {results.map((a) => {
-                const isBookmarked = bookmarked.includes(a.id);
-                return (
-                  <Card
-                    key={a.id}
-                    className="transition-all hover:border-primary/30 hover:shadow-md"
-                  >
+            <>
+              <div className={cn('space-y-4', pending && 'opacity-60')}>
+                {result.awards.map((a) => (
+                  <Card key={a.id} className="transition-all hover:border-primary/30 hover:shadow-md">
                     <CardContent className="flex gap-4 p-5">
                       <div className="min-w-0 flex-1 space-y-2.5">
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -355,15 +293,17 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
                         </div>
 
                         <Link
-                          href={`/awards/${a.id}`}
+                          href={`/awards/${encodeURIComponent(a.id)}`}
                           className="block text-[15px] font-semibold leading-snug text-foreground transition-colors hover:text-primary hover:underline"
                         >
                           {a.title}
                         </Link>
 
-                        <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                          {a.summary}
-                        </p>
+                        {(a.summary || a.backgroundOfCase) && (
+                          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                            {a.summary || a.backgroundOfCase}
+                          </p>
+                        )}
 
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-0.5 text-xs text-muted-foreground">
                           <span>
@@ -372,16 +312,12 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
                               {formatDate(a.awardDate)}
                             </span>
                           </span>
-                          <span aria-hidden className="text-border">
-                            ·
-                          </span>
+                          <span aria-hidden className="text-border">·</span>
                           <span>
                             Court: <span className="font-medium text-foreground">{a.court}</span>
                           </span>
-                          <span aria-hidden className="text-border">
-                            ·
-                          </span>
-                          <span>{a.caseNo}</span>
+                          <span aria-hidden className="text-border">·</span>
+                          <span className="font-mono">{a.caseNo}</span>
                         </div>
                       </div>
 
@@ -390,26 +326,53 @@ export function AwardsSearch({ awards }: { awards: Award[] }) {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
-                          onClick={() => toggleBookmark(a.id)}
-                          aria-pressed={isBookmarked}
-                          aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark this award'}
+                          aria-label="Bookmark this award"
                         >
-                          <Bookmark
-                            className={cn('h-4 w-4', isBookmarked && 'fill-primary text-primary')}
-                          />
+                          <Bookmark className="h-4 w-4" />
                         </Button>
-                        <Badge
-                          variant="outline"
-                          className="hidden whitespace-nowrap sm:inline-flex"
+                        <a
+                          href={a.judgmentUrl || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={cn(
+                            'hidden whitespace-nowrap text-xs font-medium sm:inline-block',
+                            a.judgmentUrl ? 'text-primary hover:underline' : 'text-muted-foreground/50'
+                          )}
                         >
-                          {a.outcome}
-                        </Badge>
+                          Source PDF ↗
+                        </a>
                       </div>
                     </CardContent>
                   </Card>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {result.totalPages > 1 && (
+                <div className="flex items-center justify-between border-t pt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={result.page <= 1 || pending}
+                    onClick={() => navigate({ page: result.page - 1 })}
+                  >
+                    ← Previous
+                  </Button>
+                  <p className="text-sm text-muted-foreground">
+                    Page <span className="font-semibold text-foreground">{result.page}</span> of{' '}
+                    {result.totalPages}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={result.page >= result.totalPages || pending}
+                    onClick={() => navigate({ page: result.page + 1 })}
+                  >
+                    Next →
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

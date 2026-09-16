@@ -98,14 +98,43 @@
   --radius-xl: calc(var(--radius) + 4px);
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Editorial serif for display headings — professional gravitas, zero cost. */
+  --font-serif: Georgia, 'Times New Roman', ui-serif, serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
 }
 
 * {
   border-color: hsl(var(--border));
 }
 
+/* Case numbers, dates, statutory refs — tabular so columns of law align. */
+.nums {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.01em;
+}
+
+/* Display headings — editorial serif, tight optical spacing. */
+.display {
+  font-family: var(--font-serif);
+  letter-spacing: -0.015em;
+}
+
 html {
   scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-fade-in {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
 
 body {

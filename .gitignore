@@ -30,6 +30,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# source corpus — re-downloadable from mp.gov.my, keep out of git
+/corpus/pdfs-full/
+/corpus/pdfs/
+
 # typescript
 *.tsbuildinfo
 
@@ -38,3 +42,5 @@ yarn-error.log*
 .vscode/*
 !.vscode/extensions.json
 .supabase-db-pass
+.env*
+__pycache__/

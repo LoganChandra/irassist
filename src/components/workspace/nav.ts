@@ -40,7 +40,7 @@ export const NAV: NavSection[] = [
     items: [
       { label: 'AI Assistant', href: '/assistant', icon: Sparkles },
       { label: 'Templates', href: '/templates', icon: FileText },
-      { label: 'Search Awards', href: '/awards', icon: Scale },
+      { label: 'Awards Data Bank', href: '/awards', icon: Scale },
       { label: 'Tools', href: '/tools', icon: Calculator },
     ],
   },
