@@ -16,6 +16,7 @@ export interface AwardsQuery {
   topics?: string[]; // Termination Index labels
   misconduct?: string[]; // Misconduct type labels
   court?: string;
+  industry?: string;
   year?: string;
   sort?: 'date' | 'relevance';
   page?: number;
@@ -84,6 +85,7 @@ function seedSearch(query: AwardsQuery): AwardsResult {
     )
       return false;
     if (query.court && query.court !== 'all' && a.court !== query.court) return false;
+    if (query.industry && query.industry !== 'all' && a.industry !== query.industry) return false;
     return true;
   });
   if (query.sort === 'date')
@@ -129,6 +131,9 @@ export async function searchAwards(query: AwardsQuery): Promise<AwardsResult> {
   if (query.court && query.court !== 'all') {
     req = req.eq('court', query.court);
   }
+  if (query.industry && query.industry !== 'all') {
+    req = req.eq('industry', query.industry);
+  }
   if (query.year && query.year !== 'all') {
     req = req.gte('award_date', `${query.year}-01-01`).lt('award_date', `${Number(query.year) + 1}-01-01`);
   }
@@ -166,21 +171,36 @@ export async function getAwardByIdDb(id: string): Promise<Award | null> {
 }
 
 /** Facet values for the filter rail — from the DB when available. */
-export async function awardsFacets(): Promise<{ courts: string[]; years: string[] }> {
+export async function awardsFacets(): Promise<{
+  courts: string[];
+  industries: string[];
+  years: string[];
+}> {
   if (!hasValidSupabaseConfig()) {
     return {
       courts: Array.from(new Set(AWARDS.map((a) => a.court))).sort(),
+      industries: Array.from(new Set(AWARDS.map((a) => a.industry).filter(Boolean))).sort(),
       years: Array.from(new Set(AWARDS.map((a) => a.awardDate.slice(0, 4)))).sort().reverse(),
     };
   }
   const supabase = await createClient();
-  const [{ data: courts }, { data: dates }] = await Promise.all([
+  const [{ data: courts }, { data: industries }, { data: dates }] = await Promise.all([
     supabase.from('awards').select('court').not('court', 'is', null),
-    supabase.from('awards').select('award_date').not('award_date', 'is', null).order('award_date', { ascending: false }),
+    supabase.from('awards').select('industry').not('industry', 'is', null),
+    supabase
+      .from('awards')
+      .select('award_date')
+      .not('award_date', 'is', null)
+      .order('award_date', { ascending: false }),
   ]);
   const courtSet = Array.from(new Set((courts ?? []).map((r: any) => r.court as string))).sort();
+  const industrySet = Array.from(
+    new Set((industries ?? []).map((r: any) => (r.industry as string).trim()).filter(Boolean))
+  ).sort();
   const yearSet = Array.from(
     new Set((dates ?? []).map((r: any) => String(r.award_date).slice(0, 4)))
-  ).sort().reverse();
-  return { courts: courtSet, years: yearSet };
+  )
+    .sort()
+    .reverse();
+  return { courts: courtSet, industries: industrySet, years: yearSet };
 }

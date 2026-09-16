@@ -29,10 +29,13 @@ import { cn, formatDate } from '@/lib/utils';
 /** Termination Index facets offered in the filters rail — the fixed index, verbatim. */
 const TOPICS: readonly string[] = TERMINATION_INDEX;
 
+/** Quick popular-search chips that seed the query — the old data-bank feel. */
+const POPULAR = [...TERMINATION_INDEX.slice(0, 4), 'Domestic Inquiry', 'Retrenchment'];
+
 interface Props {
   result: AwardsResult;
   query: AwardsQuery;
-  facets: { courts: string[]; years: string[] };
+  facets: { courts: string[]; industries: string[]; years: string[] };
 }
 
 export function AwardsSearch({ result, query, facets }: Props) {
@@ -40,6 +43,7 @@ export function AwardsSearch({ result, query, facets }: Props) {
   const [pending, startTransition] = useTransition();
   const [q, setQ] = useState(query.q ?? '');
   const [showFilters, setShowFilters] = useState(false);
+  const [bookmarked, setBookmarked] = useState<string[]>([]);
 
   // Keep the input in sync when navigation changes the URL (back/forward).
   useEffect(() => setQ(query.q ?? ''), [query.q]);
@@ -51,6 +55,7 @@ export function AwardsSearch({ result, query, facets }: Props) {
     if (merged.topics?.length) sp.set('topics', merged.topics.join('|'));
     if (merged.misconduct?.length) sp.set('misconduct', merged.misconduct.join('|'));
     if (merged.court && merged.court !== 'all') sp.set('court', merged.court);
+    if (merged.industry && merged.industry !== 'all') sp.set('industry', merged.industry);
     if (merged.year && merged.year !== 'all') sp.set('year', merged.year);
     if (merged.sort === 'relevance') sp.set('sort', 'relevance');
     if ((merged.page ?? 1) > 1) sp.set('page', String(merged.page));
@@ -61,6 +66,7 @@ export function AwardsSearch({ result, query, facets }: Props) {
     (query.topics?.length ?? 0) > 0 ||
     (query.misconduct?.length ?? 0) > 0 ||
     (query.court && query.court !== 'all') ||
+    (query.industry && query.industry !== 'all') ||
     (query.year && query.year !== 'all');
 
   function toggleTopic(t: string) {
@@ -72,14 +78,20 @@ export function AwardsSearch({ result, query, facets }: Props) {
     navigate({ misconduct: cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m] });
   }
   function clearFilters() {
-    navigate({ topics: [], misconduct: [], court: 'all', year: 'all' });
+    navigate({ topics: [], misconduct: [], court: 'all', industry: 'all', year: 'all' });
+  }
+
+  function toggleBookmark(id: string) {
+    setBookmarked((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   }
 
   const slug = (s: string) => 'topic-' + s.toLowerCase().replace(/[^a-z]+/g, '-');
 
   return (
     <div className="space-y-6">
-      {/* Search bar */}
+      {/* Search bar + popular chips — the old data-bank style */}
       <Card>
         <CardContent className="space-y-4 p-4 sm:p-5">
           <form
@@ -94,7 +106,7 @@ export function AwardsSearch({ result, query, facets }: Props) {
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search 8,900+ Industrial Court awards — parties, holdings, keywords…"
+                placeholder="Search Industrial Court awards, topics, or keywords…"
                 aria-label="Search awards"
                 className="h-12 pl-11 text-[15px]"
               />
@@ -117,11 +129,29 @@ export function AwardsSearch({ result, query, facets }: Props) {
           </form>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground">
-              {result.mode === 'db'
-                ? `Live corpus · ${result.total.toLocaleString()} awards`
-                : 'Sample corpus (database offline)'}
-            </span>
+            <span className="text-xs font-medium text-muted-foreground">Popular:</span>
+            {POPULAR.map((chip) => {
+              const active = q.trim().toLowerCase() === chip.toLowerCase();
+              return (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => {
+                    setQ(chip);
+                    navigate({ q: chip });
+                  }}
+                  aria-pressed={active}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    active
+                      ? 'border-primary/40 bg-primary/10 text-primary'
+                      : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
+                  )}
+                >
+                  {chip}
+                </button>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
@@ -188,6 +218,30 @@ export function AwardsSearch({ result, query, facets }: Props) {
 
             <Separator />
 
+            {/* Industry */}
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Industry
+              </Label>
+              <Select
+                value={query.industry ?? 'all'}
+                onValueChange={(v) => navigate({ industry: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Industries" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Industries</SelectItem>
+                  {facets.industries.map((i) => (
+                    <SelectItem key={i} value={i}>
+                      {i}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Court */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Court
@@ -207,6 +261,7 @@ export function AwardsSearch({ result, query, facets }: Props) {
               </Select>
             </div>
 
+            {/* Year */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Year
@@ -232,8 +287,8 @@ export function AwardsSearch({ result, query, facets }: Props) {
         <div className="min-w-0 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground" aria-live="polite">
-              <span className="font-semibold text-foreground">{result.total.toLocaleString()}</span>{' '}
-              {result.total === 1 ? 'award' : 'awards'}
+              About <span className="font-semibold text-foreground">{result.total.toLocaleString()}</span>{' '}
+              {result.total === 1 ? 'result' : 'results'} found
               {pending && <Loader2 className="ml-2 inline h-3.5 w-3.5 animate-spin" />}
             </p>
             <div className="flex items-center gap-2">
@@ -246,8 +301,8 @@ export function AwardsSearch({ result, query, facets }: Props) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="date">Newest first</SelectItem>
                   <SelectItem value="relevance">Relevance</SelectItem>
+                  <SelectItem value="date">Newest first</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -257,7 +312,7 @@ export function AwardsSearch({ result, query, facets }: Props) {
             <EmptyState
               icon={SearchX}
               title="No awards match your search"
-              description="Try different keywords, or clear the filters to browse the full corpus."
+              description="Try a different keyword, or clear your filters to see more awards."
             >
               {(hasActiveFilters || query.q?.trim()) && (
                 <Button
@@ -265,7 +320,7 @@ export function AwardsSearch({ result, query, facets }: Props) {
                   size="sm"
                   onClick={() => {
                     setQ('');
-                    navigate({ q: '', topics: [], misconduct: [], court: 'all', year: 'all' });
+                    navigate({ q: '', topics: [], misconduct: [], court: 'all', industry: 'all', year: 'all' });
                   }}
                 >
                   Reset search
@@ -275,76 +330,98 @@ export function AwardsSearch({ result, query, facets }: Props) {
           ) : (
             <>
               <div className={cn('space-y-4', pending && 'opacity-60')}>
-                {result.awards.map((a) => (
-                  <Card key={a.id} className="transition-all hover:border-primary/30 hover:shadow-md">
-                    <CardContent className="flex gap-4 p-5">
-                      <div className="min-w-0 flex-1 space-y-2.5">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {a.terminationIndex.map((t) => (
-                            <Badge key={t} variant="secondary">
-                              {t}
-                            </Badge>
-                          ))}
-                          {(a.misconductTypes ?? []).map((m) => (
-                            <Badge key={m} variant="outline" className="text-muted-foreground">
-                              {m}
-                            </Badge>
-                          ))}
-                        </div>
+                {result.awards.map((a) => {
+                  const isBookmarked = bookmarked.includes(a.id);
+                  return (
+                    <Card
+                      key={a.id}
+                      className="transition-all hover:border-primary/30 hover:shadow-md"
+                    >
+                      <CardContent className="flex gap-4 p-5">
+                        <div className="min-w-0 flex-1 space-y-2.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {a.terminationIndex.map((t) => (
+                              <Badge key={t} variant="secondary">
+                                {t}
+                              </Badge>
+                            ))}
+                            {(a.misconductTypes ?? []).map((m) => (
+                              <Badge key={m} variant="outline" className="text-muted-foreground">
+                                {m}
+                              </Badge>
+                            ))}
+                          </div>
 
-                        <Link
-                          href={`/awards/${encodeURIComponent(a.id)}`}
-                          className="block text-[15px] font-semibold leading-snug text-foreground transition-colors hover:text-primary hover:underline"
-                        >
-                          {a.title}
-                        </Link>
+                          <Link
+                            href={`/awards/${encodeURIComponent(a.id)}`}
+                            className="block text-[15px] font-semibold leading-snug text-foreground transition-colors hover:text-primary hover:underline"
+                          >
+                            {a.title}
+                          </Link>
 
-                        {(a.summary || a.backgroundOfCase) && (
-                          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                            {a.summary || a.backgroundOfCase}
-                          </p>
-                        )}
-
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-0.5 text-xs text-muted-foreground">
-                          <span>
-                            Award Date:{' '}
-                            <span className="font-medium text-foreground">
-                              {formatDate(a.awardDate)}
-                            </span>
-                          </span>
-                          <span aria-hidden className="text-border">·</span>
-                          <span>
-                            Court: <span className="font-medium text-foreground">{a.court}</span>
-                          </span>
-                          <span aria-hidden className="text-border">·</span>
-                          <span className="font-mono">{a.caseNo}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col items-end justify-between gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
-                          aria-label="Bookmark this award"
-                        >
-                          <Bookmark className="h-4 w-4" />
-                        </Button>
-                        <a
-                          href={a.judgmentUrl || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={cn(
-                            'hidden whitespace-nowrap text-xs font-medium sm:inline-block',
-                            a.judgmentUrl ? 'text-primary hover:underline' : 'text-muted-foreground/50'
+                          {(a.summary || a.backgroundOfCase) && (
+                            <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                              {a.summary || a.backgroundOfCase}
+                            </p>
                           )}
-                        >
-                          Source PDF ↗
-                        </a>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-0.5 text-xs text-muted-foreground">
+                            <span>
+                              Award Date:{' '}
+                              <span className="font-medium text-foreground">
+                                {formatDate(a.awardDate)}
+                              </span>
+                            </span>
+                            <span aria-hidden className="text-border">
+                              ·
+                            </span>
+                            <span>
+                              Court: <span className="font-medium text-foreground">{a.court}</span>
+                            </span>
+                            <span aria-hidden className="text-border">
+                              ·
+                            </span>
+                            <span className="font-mono">{a.caseNo}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-end justify-between gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+                            onClick={() => toggleBookmark(a.id)}
+                            aria-pressed={isBookmarked}
+                            aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark this award'}
+                          >
+                            <Bookmark
+                              className={cn('h-4 w-4', isBookmarked && 'fill-primary text-primary')}
+                            />
+                          </Button>
+                          {a.outcome ? (
+                            <Badge
+                              variant="outline"
+                              className="hidden whitespace-nowrap sm:inline-flex"
+                            >
+                              {a.outcome}
+                            </Badge>
+                          ) : (
+                            a.judgmentUrl && (
+                              <a
+                                href={a.judgmentUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hidden whitespace-nowrap text-xs font-medium text-primary hover:underline sm:inline-block"
+                              >
+                                Source PDF ↗
+                              </a>
+                            )
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
 
               {/* Pagination */}

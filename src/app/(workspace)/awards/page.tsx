@@ -22,6 +22,7 @@ export default async function AwardsPage({ searchParams }: PageProps) {
     topics: first(sp.topics) ? first(sp.topics).split('|').filter(Boolean) : [],
     misconduct: first(sp.misconduct) ? first(sp.misconduct).split('|').filter(Boolean) : [],
     court: first(sp.court) || 'all',
+    industry: first(sp.industry) || 'all',
     year: first(sp.year) || 'all',
     sort: (first(sp.sort) === 'relevance' ? 'relevance' : 'date') as 'date' | 'relevance',
     page: Math.max(1, Number(first(sp.page)) || 1),
