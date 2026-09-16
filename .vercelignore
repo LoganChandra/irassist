@@ -1,0 +1,3 @@
+# Source corpus stays local — re-downloadable from mp.gov.my.
+corpus/
+scripts/__pycache__/
