@@ -91,8 +91,13 @@ def pdf_page_count(path: str) -> int:
     return int(m.group(1)) if m else 0
 
 
-def ocr_pdf(path: str, max_pages: int = 40, dpi: int = 150) -> str:
-    """OCR the first pages of a scanned PDF. Free, local, slow-ish."""
+def ocr_pdf(path: str, max_pages: int = 12, dpi: int = 120) -> str:
+    """OCR the first pages of a scanned PDF. Free, local, bounded.
+
+    12 pages @120dpi is enough for header, facts, and classification evidence;
+    findings/summary sections deeper in the award stay heuristic-marked or empty
+    rather than costing minutes of OCR per scanned document.
+    """
     try:
         n = pdf_page_count(path)
         n = min(n or max_pages, max_pages)
