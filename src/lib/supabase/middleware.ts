@@ -55,7 +55,16 @@ export async function updateSession(request: NextRequest) {
 
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
+
+    // Infrastructure failure (backend down/paused) → fail open to demo mode so
+    // the site stays browsable. Invalid credentials (real auth response) still
+    // gate protected routes normally.
+    if (userError) {
+      console.error('[middleware] Supabase auth unavailable — passing through in demo mode:', userError.message);
+      return response;
+    }
 
     const path = request.nextUrl.pathname;
     const isProtected = PROTECTED_PREFIXES.some((p) => path.startsWith(p));
