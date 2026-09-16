@@ -54,7 +54,23 @@ export async function getProfile(): Promise<Profile | null> {
   const supabase = await createClient();
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
+
+  // Backend unreachable (paused/deleted project, network death) → fall back to
+  // the demo profile so the workspace stays browsable instead of dead-ending.
+  if (userError) {
+    console.error('[getProfile] Supabase auth unavailable — serving demo profile:', userError.message);
+    return {
+      name: CURRENT_USER.name,
+      fullName: CURRENT_USER.fullName,
+      role: CURRENT_USER.role,
+      email: CURRENT_USER.email,
+      organization: CURRENT_USER.organization,
+      industry: CURRENT_USER.industry,
+      companySize: CURRENT_USER.companySize,
+    };
+  }
   if (!user) return null;
 
   const { data } = await supabase
